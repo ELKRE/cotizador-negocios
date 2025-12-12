@@ -1,0 +1,1316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Propuestas Elektron - Versión Master con Leasing OXA</title>
+    <!-- Carga de fuentes e iconos necesarios -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    
+    <style>
+        /* Estilos base para el documento */
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        
+        /* Estilos específicos para la vista de impresión (El PDF final) */
+        @media print {
+            @page { margin: 0; size: auto; }
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            .no-print { display: none !important; }
+            .print-container { 
+                padding: 0 !important; 
+                background: white !important; 
+                overflow: visible !important;
+                height: auto !important;
+                display: block !important;
+            }
+            .hoja-a4 {
+                break-after: page;
+                page-break-after: always;
+                box-shadow: none !important;
+                margin: 0 !important;
+                width: 100% !important;
+                height: 296mm !important;
+                overflow: hidden !important;
+                transform: none !important;
+            }
+        }
+
+        /* Estilos personalizados del documento Elektron */
+        .doc-header { background-color: #0f172a; color: white; border-bottom: 4px solid #65a30d; }
+        .doc-hero { background: linear-gradient(to bottom, #f8fafc, #fff); }
+        .card-highlight { background-color: #0f172a; color: white; transform: scale(1.02); box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2); z-index: 10; border-radius: 8px; border:none; }
+        .card-normal { background-color: white; border: 1px solid #e2e8f0; border-radius: 8px; color: #0f172a; }
+        
+        /* Placeholder para Logo Interactivo */
+        .logo-placeholder {
+            width: 220px;
+            height: 70px;
+            border: 1px dashed #334155;
+            background-color: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+            overflow: hidden;
+            position: relative;
+        }
+        .logo-placeholder:hover {
+            border-color: #84cc16;
+            color: #84cc16;
+            background-color: rgba(132, 204, 22, 0.1);
+        }
+        .logo-placeholder.has-logo {
+            border: none !important;
+            background-color: transparent !important;
+        }
+        .logo-preview-img {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+        }
+
+        /* Inputs del panel lateral */
+        .input-group { margin-bottom: 0.75rem; }
+        .input-label { display: block; color: #94a3b8; font-size: 0.7rem; font-weight: 700; margin-bottom: 0.2rem; text-transform: uppercase; }
+        .input-field { 
+            width: 100%; 
+            background-color: #1e293b; 
+            border: 1px solid #334155; 
+            color: white; 
+            padding: 0.4rem; 
+            font-size: 0.8rem; 
+            border-radius: 0.375rem;
+            transition: border-color 0.2s;
+        }
+        .input-field:focus { outline: none; border-color: #84cc16; }
+        
+        /* Estilo para campos deshabilitados/calculados */
+        .input-field:read-only {
+            background-color: #0f172a; /* Más oscuro */
+            color: #94a3b8; /* Texto gris */
+            border-color: #334155;
+            cursor: not-allowed;
+        }
+
+        /* Estilos para campos extras en sidebar */
+        .extra-field-wrapper {
+            background: #0f172a;
+            border: 1px dashed #334155;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 0.5rem;
+            position: relative;
+        }
+        .btn-delete {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        /* Toggle Switch */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #84cc16;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #84cc16;
+        }
+        
+        /* Barra de desplazamiento personalizada */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+        
+        /* Clase para ocultar elementos durante la generación del PDF */
+        .hide-on-pdf { display: none !important; }
+        
+        /* --- ESTILOS SECCIÓN LEASING OXA --- */
+        .leasing-container {
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .leasing-header-strip {
+            background: #1e293b;
+            color: white;
+            padding: 6px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #84cc16;
+        }
+        .oxa-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+        }
+        .oxa-table th {
+            background-color: #f8fafc;
+            color: #475569;
+            font-weight: 700;
+            text-transform: uppercase;
+            padding: 5px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
+        }
+        .oxa-table td {
+            padding: 5px;
+            border-bottom: 1px solid #f1f5f9;
+            color: #334155;
+            text-align: center;
+        }
+        .oxa-table tr:last-child td { border-bottom: none; }
+        
+        .col-concept { text-align: left !important; font-weight: 700; color: #1e293b; padding-left: 10px !important; }
+        .col-highlight { background-color: #f7fee7; color: #1a2e05; font-weight: 700; }
+        .val-residual { color: #94a3b8; font-style: italic; }
+
+        /* --- ESTILOS TABLA AMORTIZACIÓN (Anexo) --- */
+        .amort-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+        }
+        .amort-table th {
+            background-color: #0f172a;
+            color: white;
+            padding: 6px;
+            text-align: right;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .amort-table th:first-child { text-align: center; border-top-left-radius: 4px; }
+        .amort-table th:last-child { border-top-right-radius: 4px; }
+        .amort-table td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: right;
+            color: #334155;
+        }
+        .amort-table td:first-child { text-align: center; font-weight: bold; color: #0f172a; }
+        .amort-table tr:nth-child(even) { background-color: #f8fafc; }
+        
+        /* Fila de Retorno de Inversión (Highlight) */
+        .row-roi-hit {
+            background-color: #ecfccb !important; /* Lime-100 */
+            border-left: 3px solid #84cc16;
+        }
+        .row-roi-hit td {
+            color: #365314;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="bg-gray-200 flex h-screen overflow-hidden">
+
+    <!-- PANEL LATERAL DE EDICIÓN (Izquierda) -->
+    <div id="editor-panel" class="w-80 bg-slate-900 text-white flex flex-col h-full shadow-2xl z-50 flex-shrink-0">
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-slate-800 p-2 rounded">
+                    <i class="fa-solid fa-pen-to-square text-lime-500 text-lg"></i>
+                </div>
+                <div>
+                    <h2 class="font-bold text-base">Editor Elektron</h2>
+                    <p class="text-[10px] text-slate-400">Modifica en tiempo real</p>
+                </div>
+            </div>
+            <!-- BOTÓN DE BORRADO CLARO -->
+            <button onclick="resetData()" class="text-[10px] font-bold text-red-400 hover:text-red-300 border border-red-900/50 bg-red-900/20 px-2 py-1 rounded transition-colors flex items-center gap-1" title="Borrar todos los datos y reiniciar">
+                <i class="fa-solid fa-trash"></i> BORRAR DATOS
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+            
+            <!-- Grupo 1: Datos Generales -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Datos del Cliente</h3>
+                <div class="input-group">
+                    <label class="input-label">Cliente / Empresa</label>
+                    <input type="text" id="input-cliente" class="input-field" placeholder="Nombre del Cliente" oninput="updateDoc()">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Folio Cotización</label>
+                    <input type="text" id="input-cotizacion" class="input-field" placeholder="Ej. COT-2025..." oninput="updateDoc()">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Potencia del Sistema (kWp)</label>
+                    <input type="text" id="input-potencia" class="input-field" placeholder="Ej. 307" oninput="updateDoc()">
+                </div>
+                <!-- Agregado: Tarifa y Precio (Para mantener consistencia) -->
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label class="input-label">Tarifa</label>
+                        <input type="text" id="input-tarifa" class="input-field" placeholder="Ej. GDMTH" oninput="updateDoc()">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Precio kWh</label>
+                        <input type="text" id="input-precio-kwh" class="input-field" placeholder="$ 0.00" oninput="updateDoc()">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grupo 2: Métricas -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Métricas de Impacto</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label class="input-label">Cobertura (%)</label>
+                        <input type="text" id="input-cobertura" class="input-field" placeholder="Ej. 95" oninput="updateDoc()">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">ROI (Auto - años)</label>
+                        <input type="text" id="input-roi" class="input-field" placeholder="0" readonly>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Ahorro Anual (Auto)</label>
+                    <input type="text" id="input-ahorro-anual" class="input-field" placeholder="0" readonly>
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Utilidad por Eficiencia Energética</label>
+                    <input type="text" id="input-ahorro-30" class="input-field" placeholder="0" readonly>
+                </div>
+            </div>
+
+            <!-- Grupo 3: Financiero -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Comparativa Mensual</h3>
+                <div class="input-group">
+                    <label class="input-label">Pago Actual CFE ($)</label>
+                    <input type="text" id="input-pago-actual" class="input-field" placeholder="0" oninput="updateDoc()">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Pago Con Solar ($)</label>
+                    <input type="text" id="input-pago-solar" class="input-field" placeholder="0" oninput="updateDoc()">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Ahorro Mensual (Auto)</label>
+                    <input type="text" id="input-ahorro-mensual" class="input-field" placeholder="0" readonly>
+                </div>
+            </div>
+            
+            <!-- Grupo 4: Datos Técnicos Editables -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Datos Técnicos Editables</h3>
+                <div class="input-group">
+                    <label class="input-label">Generación Anual</label>
+                    <input type="text" id="input-generacion" class="input-field" placeholder="Ej. 465 MWh" oninput="updateDoc()">
+                </div>
+                
+                <div class="border-l-2 border-slate-700 pl-2 mb-2">
+                    <label class="input-label text-lime-400">Módulos</label>
+                    <div class="input-group mb-1">
+                        <input type="text" id="input-modulos-main" class="input-field mb-1" placeholder="Ej. 488 x Jinko Solar..." oninput="updateDoc()">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="input-modulos-sub" class="input-field text-xs text-slate-400" placeholder="Detalle / Garantía" oninput="updateDoc()">
+                    </div>
+                </div>
+
+                <div class="border-l-2 border-slate-700 pl-2 mb-2">
+                    <label class="input-label text-lime-400">Inversores</label>
+                    <div class="input-group mb-1">
+                        <input type="text" id="input-inversores-main" class="input-field mb-1" placeholder="Ej. 4 x Growatt MAC..." oninput="updateDoc()">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="input-inversores-sub" class="input-field text-xs text-slate-400" placeholder="Detalle / Garantía" oninput="updateDoc()">
+                    </div>
+                </div>
+
+                <!-- Contenedor para campos extras dinámicos -->
+                <div id="sidebar-extras-container" class="mt-4"></div>
+                
+                <button onclick="addExtraField()" class="w-full mt-2 bg-slate-800 hover:bg-slate-700 text-lime-400 text-xs font-bold py-2 px-2 rounded border border-dashed border-slate-600 transition-colors">
+                    <i class="fa-solid fa-plus mr-1"></i> AGREGAR CAMPO EXTRA
+                </button>
+            </div>
+
+            <!-- Grupo 5: Tiempos de Ejecución -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Tiempos de Ejecución</h3>
+                <div class="input-group">
+                    <label class="input-label">Tiempo de Obra</label>
+                    <input type="text" id="input-tiempo-obra" class="input-field" placeholder="Ej. 4 semanas" oninput="updateDoc()">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">Arranque de Sistema</label>
+                    <input type="text" id="input-arranque" class="input-field" placeholder="Ej. 2 semanas" oninput="updateDoc()">
+                </div>
+            </div>
+
+            <!-- Grupo 6: Leasing (NUEVO) -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1 flex justify-between items-center">
+                    Plan de Arrendamiento
+                    <input type="checkbox" id="input-show-leasing" class="accent-lime-500" checked onchange="updateDoc()">
+                </h3>
+            </div>
+            
+            <!-- Grupo Extra: Anexo -->
+             <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1 flex justify-between items-center">
+                    Incluir Anexo (Tabla)
+                    <input type="checkbox" id="input-show-annex" class="accent-lime-500" checked onchange="updateDoc()">
+                </h3>
+            </div>
+
+            <!-- Grupo 7: Costos -->
+            <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Inversión</h3>
+                <div class="input-group">
+                    <label class="input-label">Inversión Total (IVA Inc.)</label>
+                    <input type="text" id="input-total" class="input-field" placeholder="0" oninput="updateDoc()">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label class="input-label">Subtotal (Auto)</label>
+                        <input type="text" id="input-subtotal" class="input-field" placeholder="0" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">IVA (Auto)</label>
+                        <input type="text" id="input-iva" class="input-field" placeholder="0" readonly>
+                    </div>
+                </div>
+            </div>
+            
+             <!-- Grupo 8: Ambiente -->
+             <div>
+                <h3 class="text-lime-500 text-[10px] font-bold uppercase mb-2 border-b border-slate-800 pb-1">Ambiente</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label class="input-label">Autos Fuera (Auto)</label>
+                        <input type="text" id="input-autos" class="input-field" placeholder="0" readonly>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">Ton CO2 (Auto)</label>
+                        <input type="text" id="input-co2" class="input-field" placeholder="0" readonly>
+                    </div>
+                </div>
+                <!-- CAMPO AGREGADO: Notas -->
+                <div class="input-group mt-2">
+                    <label class="input-label">Notas / Comentarios</label>
+                    <textarea id="input-notas" class="input-field h-20 resize-none text-[10px]" placeholder="Escribe aquí notas adicionales..." oninput="updateDoc()"></textarea>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="p-4 border-t border-slate-800 bg-slate-900">
+            <button onclick="downloadPDF()" class="w-full bg-lime-600 hover:bg-lime-500 text-white font-bold py-2 px-4 rounded-lg shadow-lg transition-all flex items-center justify-center gap-2 text-sm" id="btn-download">
+                <i class="fa-solid fa-download"></i> <span id="btn-text">DESCARGAR PDF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- AREA DE VISTA PREVIA (Derecha) -->
+    <div class="flex-1 bg-gray-200 overflow-hidden relative flex flex-col items-center justify-start pt-6">
+        
+        <!-- CONTENEDOR CON SCROLL (Abarca ambas páginas) -->
+        <div class="overflow-auto w-full h-full flex justify-center pb-10">
+            <div id="document-to-print">
+                
+                <!-- HOJA 1: PROPUESTA EJECUTIVA -->
+                <div class="hoja-a4 bg-white shadow-2xl relative flex flex-col mb-10" style="width: 210mm; height: 296mm; overflow: hidden; max-width: 900px;">
+                    
+                    <!-- HEADER DOC -->
+                    <header class="doc-header px-8 py-3 flex justify-between items-center">
+                        <!-- LOGO PLACEHOLDER -->
+                        <div id="logo-container" class="logo-placeholder" onclick="document.getElementById('logo-upload').click()">
+                            <input type="file" id="logo-upload" accept="image/*" style="display:none" onchange="loadLogo(event)">
+                            <div id="logo-placeholder-content" class="text-center">
+                                <i class="fa-regular fa-image text-2xl mb-1"></i><br>
+                                Clic para agregar Logo
+                            </div>
+                            <img id="logo-preview" class="logo-preview-img" style="display:none;" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=">
+                        </div>
+                        
+                        <div class="text-right">
+                            <h2 class="text-xl font-bold text-slate-100 uppercase tracking-tight" id="val-cliente">NOMBRE DEL CLIENTE</h2>
+                            <p class="text-sm text-lime-400 font-semibold mt-1">
+                                Cotización: <span id="val-cotizacion">-</span> <span class="text-slate-500 mx-1">|</span> <span id="val-potencia-head">-</span> kWp
+                            </p>
+                        </div>
+                    </header>
+
+                    <!-- HERO METRICS -->
+                    <div class="doc-hero grid grid-cols-3 gap-4 px-8 py-3 border-b border-slate-100">
+                        <!-- Card 1 -->
+                        <div class="card-normal p-2 text-center">
+                            <div class="text-[2rem] font-extrabold text-slate-900 mb-0.5 leading-none"><span id="val-cobertura">-</span>%</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cobertura Energética</div>
+                        </div>
+                        <!-- Card 2 -->
+                        <div class="card-highlight p-2 text-center relative">
+                            <!-- CAMBIO: 'años' en minúsculas -->
+                            <div class="text-[2rem] font-extrabold text-lime-500 mb-0.5 leading-none"><span id="val-roi">-</span> años</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Retorno de Inversión</div>
+                            <div class="text-[8px] text-slate-500 mt-0.5">Aplicando Estrategia Fiscal</div>
+                        </div>
+                        <!-- Card 3 -->
+                        <div class="card-normal p-2 text-center">
+                            <div class="text-[2rem] font-extrabold text-slate-900 mb-0.5 leading-none">$<span id="val-ahorro-anual">-</span></div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ahorro Anual (MXN)</div>
+                            <div class="text-[8px] text-slate-400 mt-0.5">Flujo de efectivo</div>
+                        </div>
+                    </div>
+
+                    <!-- MAIN CONTENT -->
+                    <div class="grid grid-cols-2 gap-5 px-8 py-3 flex-grow main-grid">
+                        
+                        <!-- COLUMNA IZQUIERDA: IMPACTO FINANCIERO Y FISCAL -->
+                        <div>
+                            <!-- Header Sección -->
+                            <div class="flex justify-between items-end mb-1.5 text-slate-900">
+                                <div class="flex items-center">
+                                    <i class="fa-solid fa-chart-line text-lime-600 mr-2 text-lg"></i>
+                                    <h3 class="font-bold text-xs uppercase tracking-wide">IMPACTO FINANCIERO</h3>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-50 rounded-lg p-2.5 border border-slate-100 mb-2.5">
+                                <!-- Barras -->
+                                <div class="flex items-center mb-2">
+                                    <div class="w-24 text-[9px] font-bold text-slate-700">Pago Actual Prom.</div>
+                                    <div class="flex-grow bg-slate-200 h-4 rounded overflow-hidden">
+                                        <div class="h-full bg-slate-900 flex items-center px-2 w-full">
+                                            <span class="text-[9px] font-bold text-white">$<span id="val-pago-actual">-</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center">
+                                    <div class="w-24 text-[9px] font-bold text-slate-700">Con Energía Solar</div>
+                                    <div class="flex-grow bg-transparent h-4 rounded overflow-hidden">
+                                        <div id="bar-pago-solar" class="h-full bg-lime-600 flex items-center px-2 rounded bar-transition" style="width: 20%;">
+                                            <span class="text-[9px] font-bold text-slate-900">$<span id="val-pago-solar">-</span></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="mt-2 bg-white border border-dashed border-lime-500 rounded p-1.5 flex items-center justify-center gap-2">
+                                    <div class="text-[10px] font-bold text-slate-900">Ahorro Mensual</div>
+                                    <div class="text-lg font-extrabold text-lime-600">$<span id="val-ahorro-mensual">-</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Fiscal -->
+                            <div class="bg-lime-50 border-l-3 border-lime-600 p-2.5 rounded-r-lg mb-2.5">
+                                <h4 class="text-xs font-bold text-lime-900 mb-1 flex items-center">
+                                    <i class="fa-solid fa-file-invoice-dollar mr-1.5"></i> Estrategia Fiscal
+                                </h4>
+                                <p class="text-[9px] text-lime-800 leading-tight mb-1.5">
+                                    Aprovechando el <strong>Art. 34 Fracc. XIII de la LISR</strong>, su empresa puede deducir el 100% de la inversión en el primer año. Esto genera un escudo fiscal equivalente al 40% del valor del proyecto (ISR+PTU), reduciendo el ROI a solo <strong><span id="val-roi-text">-</span> años</strong>.
+                                </p>
+                                
+                                <div class="bg-white/60 border border-lime-200 rounded p-1.5 flex justify-between items-center">
+                                    <div>
+                                        <div class="text-[9px] font-bold text-lime-900 uppercase">Utilidad por Eficiencia Energética (30 años)</div>
+                                        <div class="text-[7px] text-lime-700">*Inflación 4%</div>
+                                    </div>
+                                    <div class="text-lg font-extrabold text-slate-900 tracking-tight">$<span id="val-ahorro-30">-</span> <span class="suffix-small">MILL</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Iconos Ambientales -->
+                            <div class="flex gap-2">
+                                <div class="flex-1 bg-emerald-50 p-2 rounded-lg text-center border border-emerald-100 flex flex-col justify-center items-center">
+                                    <i class="fa-solid fa-car-side text-emerald-600 text-lg mb-0.5"></i>
+                                    <div class="text-emerald-800 font-bold text-[9px] leading-tight">
+                                        <span id="val-autos">-</span> Autos
+                                    </div>
+                                    <div class="text-[7px] text-emerald-600 mt-0.5">Fuera de circulación anualmente</div>
+                                </div>
+                                
+                                <div class="flex-1 bg-emerald-50 p-2 rounded-lg text-center border border-emerald-100 flex flex-col justify-center items-center">
+                                    <i class="fa-solid fa-cloud text-emerald-600 text-lg mb-0.5"></i>
+                                    <div class="text-emerald-800 font-bold text-[9px] leading-tight"><span id="val-co2">-</span> Ton CO₂</div>
+                                    <div class="text-[7px] text-emerald-600 mt-0.5">Evitadas anualmente</div>
+                                </div>
+                            </div>
+                            
+                            <!-- VISUALIZACIÓN AGREGADA: Notas (Se oculta si está vacío) -->
+                            <div id="container-notas" class="mt-2.5 p-2 bg-yellow-50/50 border border-yellow-100 rounded text-justify hidden">
+                                <p class="text-[8px] text-slate-600 leading-relaxed" id="val-notas"></p>
+                            </div>
+                        </div>
+
+                        <!-- COLUMNA DERECHA: PROPUESTA TÉCNICA -->
+                        <div class="flex flex-col h-full">
+                            <div class="flex items-center mb-1.5 text-slate-900">
+                                <i class="fa-solid fa-microchip text-lime-600 mr-2 text-lg"></i>
+                                <h3 class="font-bold text-xs uppercase tracking-wide">PROPUESTA TÉCNICA</h3>
+                            </div>
+
+                            <div class="bg-white border border-slate-200 rounded-lg p-3 text-[10px] mb-2">
+                                <ul class="space-y-1.5" id="tech-list-container">
+                                    <li class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Potencia Instalada DC</span>
+                                        <span class="font-bold text-slate-900"><span id="val-potencia">-</span> kWp</span>
+                                    </li>
+                                    <li class="flex justify-between items-center border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Generación Anual</span>
+                                        <span class="font-bold text-slate-900" id="val-generacion">-</span>
+                                    </li>
+                                    <li class="flex justify-between items-start border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Módulos (Paneles)</span>
+                                        <div class="text-right">
+                                            <span class="font-bold text-slate-900 block" id="val-modulos-main">-</span>
+                                            <span class="text-slate-400" id="val-modulos-sub">-</span>
+                                        </div>
+                                    </li>
+                                    <li class="flex justify-between items-start border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Inversores</span>
+                                        <div class="text-right">
+                                            <span class="font-bold text-slate-900 block" id="val-inversores-main">-</span>
+                                            <span class="text-slate-400" id="val-inversores-sub">-</span>
+                                        </div>
+                                    </li>
+                                    <li class="flex justify-between items-start border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Estructura</span>
+                                        <div class="text-right">
+                                            <span class="font-bold text-slate-900 block">Aluminio Anodizado</span>
+                                            <span class="text-slate-400">25 años de garantía</span>
+                                        </div>
+                                    </li>
+                                    <!-- NUEVO: Instalación AC y DC -->
+                                    <li class="flex justify-between items-start border-b border-slate-100 pb-1">
+                                        <span class="text-slate-500">Instalación AC y DC</span>
+                                        <div class="text-right">
+                                            <span class="font-bold text-slate-900 block">Certificada</span>
+                                            <span class="text-[7px] text-slate-400 leading-tight block max-w-[150px] ml-auto">Acorde a estándares de calidad EC-0856/EC-1181 y manual para interconexión de centrales eléctricas</span>
+                                        </div>
+                                    </li>
+                                    <li class="flex justify-between items-start pt-1">
+                                        <span class="text-slate-500">Trámites CFE</span>
+                                        <div class="text-right">
+                                            <span class="font-bold text-slate-900 block">Gestión Integral (UVIE/UIIE)</span>
+                                        </div>
+                                    </li>
+                                    <!-- Aquí se insertarán los campos extras -->
+                                    <div id="doc-extras-container"></div>
+                                </ul>
+                            </div>
+
+                            <!-- Garantías y Seguridad -->
+                            <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 flex-grow">
+                                <h4 class="text-[9px] font-bold text-slate-700 uppercase mb-2 border-b border-slate-200 pb-1">Garantías y Certidumbre</h4>
+                                <div class="space-y-2">
+                                    <div class="flex items-start gap-2">
+                                        <i class="fa-solid fa-helmet-safety text-lime-600 mt-0.5"></i>
+                                        <div>
+                                            <div class="text-[9px] font-bold text-slate-800">5 Años Instalación</div>
+                                            <div class="text-[8px] text-slate-500 leading-tight">Garantía contra vicios ocultos</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <i class="fa-solid fa-wifi text-lime-600 mt-0.5"></i>
+                                        <div>
+                                            <div class="text-[9px] font-bold text-slate-800">Monitoreo y Soporte</div>
+                                            <div class="text-[8px] text-slate-500 leading-tight">Remoto Wi-Fi, Reportes mensuales y Soporte técnico ilimitado</div>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-start gap-2">
+                                        <i class="fa-solid fa-users-gear text-lime-600 mt-0.5"></i>
+                                        <div>
+                                            <div class="text-[9px] font-bold text-slate-800">Capacitación</div>
+                                            <div class="text-[8px] text-slate-500 leading-tight">A personal de mantenimiento</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CRONOGRAMA DE EJECUCIÓN -->
+                    <div class="mx-8 mb-2 timeline-section">
+                        <div class="flex justify-between items-center mb-1">
+                            <h3 class="font-bold text-[9px] uppercase tracking-wide text-slate-900">
+                                <i class="fa-solid fa-list-check text-lime-600 mr-1"></i> Cronograma de Ejecución y Servicio
+                            </h3>
+                        </div>
+                        <div class="relative flex justify-between items-center bg-slate-50 rounded-lg p-2 border border-slate-100">
+                            <div class="absolute top-1/2 left-8 right-8 h-px bg-slate-200 -z-0 transform -translate-y-1/2"></div>
+                            <div class="relative z-10 flex flex-col items-center text-center w-1/5">
+                                <div class="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center text-xs mb-0.5 border border-slate-50 shadow-sm"><i class="fa-solid fa-file-contract"></i></div>
+                                <div class="text-[9px] font-bold text-slate-800">Formalización</div>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center text-center w-1/5">
+                                <div class="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center text-xs mb-0.5 border border-slate-300 shadow-sm"><i class="fa-solid fa-compass-drafting"></i></div>
+                                <div class="text-[9px] font-bold text-slate-800">Ingeniería</div>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center text-center w-1/5">
+                                <div class="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center text-xs mb-0.5 border border-slate-300 shadow-sm"><i class="fa-solid fa-screwdriver-wrench"></i></div>
+                                <div class="text-[9px] font-bold text-slate-800">Instalación</div>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center text-center w-1/5">
+                                <div class="w-8 h-8 rounded-full bg-white text-slate-500 flex items-center justify-center text-xs mb-0.5 border border-slate-300 shadow-sm"><i class="fa-solid fa-plug-circle-check"></i></div>
+                                <div class="text-[9px] font-bold text-slate-800">Interconexión</div>
+                            </div>
+                            <div class="relative z-10 flex flex-col items-center text-center w-1/5">
+                                <div class="w-8 h-8 rounded-full bg-lime-500 text-white flex items-center justify-center text-xs mb-0.5 border border-slate-50 shadow-sm"><i class="fa-solid fa-headset"></i></div>
+                                <div class="text-[9px] font-bold text-slate-800">Post-Venta</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex justify-center gap-8 mt-1 border-t border-slate-100 pt-1">
+                            <div class="text-center flex gap-2 items-center">
+                                <span class="text-[8px] font-bold text-slate-400 uppercase">Tiempo de Obra:</span>
+                                <span class="text-[9px] font-bold text-slate-800" id="val-tiempo-obra">-</span>
+                            </div>
+                            <div class="text-center flex gap-2 items-center">
+                                <span class="text-[8px] font-bold text-slate-400 uppercase">Arranque de Sistema:</span>
+                                <span class="text-[9px] font-bold text-slate-800" id="val-arranque">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- INVESTMENT FOOTER (REORDENADO: PRIMERO) -->
+                    <div class="mx-8 mb-2 bg-slate-900 rounded-lg p-3 text-white text-center relative overflow-hidden">
+                        <div class="absolute top-0 right-0 w-64 h-64 bg-lime-500 rounded-full blur-[80px] opacity-10 pointer-events-none"></div>
+                        
+                        <div class="relative z-10 flex justify-between items-center w-full px-2">
+                            <!-- Textos a la Izquierda -->
+                            <div class="text-left">
+                                <h3 class="text-[10px] font-bold text-slate-400 uppercase mb-0.5 tracking-wider">Inversión Total (IVA Incluido)</h3>
+                                <div class="text-[9px] text-slate-500 mt-0.5 font-medium">Subtotal: $<span id="val-subtotal">-</span> | IVA: $<span id="val-iva">-</span></div>
+                                <div class="text-[8px] text-slate-400 font-bold italic mt-0.5">*Pago de Contado</div>
+                            </div>
+                            <!-- Monto a la Derecha -->
+                            <div class="text-right">
+                                <div class="text-2xl font-extrabold text-lime-500 tracking-tight">$<span id="val-total">-</span> <span class="text-xs font-normal text-white">MXN</span></div>
+                                <div class="text-[7px] text-slate-400 font-bold mt-1 tracking-wide whitespace-nowrap">
+                                    50% ANTICIPO <span class="mx-1 text-slate-600">|</span> 40% TÉRMINO DE OBRA <span class="mx-1 text-slate-600">|</span> 10% ARRANQUE DE SISTEMA
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECCIÓN DE ARRENDAMIENTO (MODIFICADA CON TABLA OXA) -->
+                    <div id="leasing-section" class="mx-8 mb-2 rounded-lg border border-slate-200 overflow-hidden bg-white leasing-container" style="display: none;">
+                        <!-- Header -->
+                        <div class="leasing-header-strip">
+                             <h3 class="text-[10px] font-extrabold uppercase text-white flex items-center">
+                                 <i class="fa-solid fa-file-signature text-lime-400 mr-2"></i> ARRENDAMIENTO PURO
+                             </h3>
+                             <span class="text-[8px] text-slate-200">Precios con IVA incluido</span>
+                        </div>
+                
+                        <!-- Tabla Dinámica OXA -->
+                        <table class="oxa-table">
+                            <thead>
+                                <tr>
+                                    <th>Plazo</th>
+                                    <th>Pago Inicial</th>
+                                    <th class="col-highlight">Renta Mensual</th>
+                                    <th>Valor Residual</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- 36 Meses -->
+                                <tr>
+                                    <td class="col-concept">36 Meses</td>
+                                    <td>$<span id="lease-init-36">-</span></td>
+                                    <td class="col-highlight">$<span id="lease-rent-36">-</span></td>
+                                    <td class="val-residual">$<span id="lease-res-36">-</span></td>
+                                </tr>
+                                <!-- 48 Meses -->
+                                <tr>
+                                    <td class="col-concept">48 Meses</td>
+                                    <td>$<span id="lease-init-48">-</span></td>
+                                    <td class="col-highlight">$<span id="lease-rent-48">-</span></td>
+                                    <td class="val-residual">$<span id="lease-res-48">-</span></td>
+                                </tr>
+                                <!-- 60 Meses -->
+                                <tr>
+                                    <td class="col-concept">60 Meses</td>
+                                    <td>$<span id="lease-init-60">-</span></td>
+                                    <td class="col-highlight">$<span id="lease-rent-60">-</span></td>
+                                    <td class="val-residual">$<span id="lease-res-60">-</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        
+                        <!-- Footer info -->
+                        <div class="bg-slate-50 text-center py-1 border-t border-slate-100">
+                            <div class="text-[6px] text-slate-400 leading-tight px-2">
+                                *Sujeto a aprobación de crédito. El pago inicial incluye comisión por apertura y gastos de gestión administrativa.
+                                <span class="text-lime-600 font-bold ml-1">100% Deducible de Impuestos</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FOOTER -->
+                    <footer class="px-8 py-2 border-t border-slate-100 text-[8px] text-slate-400 bg-white relative flex items-center justify-center">
+                        <span class="font-bold text-slate-700 uppercase tracking-wider text-center">ELEKTRON RENOVABLES - ENERGÍA INTELIGENTE</span>
+                        <div class="hide-on-pdf bg-lime-500 text-slate-900 px-3 py-1.5 rounded font-bold hover:bg-lime-400 cursor-pointer transition-colors text-[10px] absolute right-8">ACEPTAR PROPUESTA</div>
+                    </footer>
+                </div> <!-- Fin Hoja 1 -->
+
+                <!-- HOJA 2: ANEXO FINANCIERO (Oculta por defecto) -->
+                <div id="annex-page" class="hoja-a4 bg-white shadow-2xl relative flex flex-col mb-10" style="width: 210mm; height: 296mm; overflow: hidden; display: none;">
+                    
+                    <header class="doc-header px-8 py-3 flex justify-between items-center bg-slate-900">
+                        <div class="text-white">
+                            <h2 class="text-lg font-bold uppercase tracking-tight">Anexo Financiero</h2>
+                            <p class="text-xs text-lime-400">Proyección de Flujo de Efectivo (30 Años)</p>
+                        </div>
+                        <div class="text-right text-white text-[9px]">
+                            <div class="font-bold" id="annex-cliente">CLIENTE</div>
+                            <div>Folio: <span id="annex-folio">-</span></div>
+                        </div>
+                    </header>
+
+                    <div class="p-8 flex-grow overflow-hidden">
+                        <div class="mb-4 text-[10px] text-slate-600 bg-slate-50 p-3 rounded border border-slate-200">
+                            <p><strong>Consideraciones del Modelo:</strong></p>
+                            <ul class="list-disc ml-4 mt-1 space-y-0.5">
+                                <li>Inflación Energética Anual Estimada: <strong>4.0%</strong></li>
+                                <!-- Merma eliminada del texto también -->
+                                <li><strong>Incluye Escudo Fiscal:</strong> Impacto positivo del 40% sobre el subtotal en el flujo del Año 1.</li>
+                                <li>Se asume reinversión nula de ahorros (Flujo Simple).</li>
+                                <li><span class="text-lime-600 font-bold">Fila Resaltada:</span> Indica el año aproximado de recuperación de inversión (ROI).</li>
+                            </ul>
+                        </div>
+
+                        <!-- TABLA GENERADA -->
+                        <div class="overflow-hidden rounded border border-slate-200">
+                            <table class="amort-table">
+                                <thead>
+                                    <tr>
+                                        <th width="10%">Año</th>
+                                        <th width="25%">Ahorro Anual</th>
+                                        <th width="30%">Flujo Acumulado</th>
+                                        <th width="35%">Estado de Inversión</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="amortization-body">
+                                    <!-- Rows injected via JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <footer class="px-8 py-2 border-t border-slate-100 text-[8px] text-slate-400 bg-white relative flex items-center justify-center">
+                        <span class="font-bold text-slate-700 uppercase tracking-wider text-center">ELEKTRON RENOVABLES - ANEXO FINANCIERO</span>
+                    </footer>
+                </div> <!-- Fin Hoja 2 -->
+
+            </div>
+        </div>
+    </div>
+
+    <!-- LÓGICA JAVASCRIPT -->
+    <script>
+        // Campos de dinero
+        const moneyFields = [
+            'input-pago-actual', 'input-pago-solar', 
+            'input-ahorro-mensual', 'input-total', 'input-subtotal', 'input-iva',
+            'input-leasing-mensual', 'input-ahorro-anual',
+            'input-precio-kwh' 
+        ];
+
+        const decimalFields = [
+             'input-ahorro-30', 
+             'input-roi',
+             'input-co2'
+        ];
+
+        function formatDecimal(str) {
+             if (!str) return '-';
+             const clean = str.toString().replace(/[^0-9.]/g, '');
+             const num = parseFloat(clean);
+             if (isNaN(num)) return str;
+             return num.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+        }
+
+        function formatMoney(str) {
+            if (!str) return '-';
+            const clean = str.toString().replace(/[^0-9.]/g, '');
+            const num = parseFloat(clean);
+            if (isNaN(num)) return str;
+            return num.toLocaleString('en-US', {maximumFractionDigits: 0});
+        }
+        
+        // Helper para obtener valor numérico puro
+        function getRawValue(id) {
+            const el = document.getElementById(id);
+            if (!el || !el.value) return 0;
+            return parseFloat(el.value.replace(/[^0-9.]/g, '')) || 0;
+        }
+
+        function loadLogo(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.getElementById('logo-preview');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                    document.getElementById('logo-placeholder-content').style.display = 'none';
+                    document.getElementById('logo-container').classList.add('has-logo');
+                    saveData(); 
+                }
+                reader.readAsDataURL(file);
+            }
+        }
+
+        async function downloadPDF() {
+            const btn = document.getElementById('btn-text');
+            const originalText = btn.innerText;
+            
+            if(btn.innerText === 'GENERANDO...') return;
+
+            btn.innerText = 'GENERANDO...';
+            
+            const element = document.getElementById('document-to-print');
+            const showAnnex = document.getElementById('input-show-annex').checked;
+            const annexPage = document.getElementById('annex-page');
+            
+            const cliente = document.getElementById('input-cliente').value || 'CLIENTE';
+            const cotizacion = document.getElementById('input-cotizacion').value || 'COTIZACION';
+            const safeCliente = cliente.replace(/[^a-zA-Z0-9\s]/g, '').trim().toUpperCase(); 
+            const safeCotizacion = cotizacion.replace(/[^a-zA-Z0-9\s-]/g, '').trim().toUpperCase();
+            const finalFilename = `${safeCliente}_${safeCotizacion}.pdf`;
+            
+            try {
+                await html2pdf().set({
+                    margin: 0, 
+                    filename: finalFilename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, scrollY: 0, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                    pagebreak: { mode: ['css', 'legacy'] } 
+                }).from(element).save();
+                btn.innerText = originalText;
+            } catch (error) {
+                console.error("PDF Error:", error);
+                btn.innerText = "Error (Reintentar)";
+                setTimeout(() => btn.innerText = originalText, 3000);
+            }
+        }
+
+        const inputMap = {
+            'input-cliente': ['val-cliente', 'annex-cliente'],
+            'input-cotizacion': ['val-cotizacion', 'annex-folio'],
+            'input-potencia': ['val-potencia', 'val-potencia-head'],
+            'input-cobertura': 'val-cobertura',
+            'input-roi': ['val-roi', 'val-roi-text'],
+            'input-ahorro-anual': 'val-ahorro-anual',
+            'input-ahorro-30': 'val-ahorro-30',
+            'input-pago-actual': 'val-pago-actual',
+            'input-pago-solar': 'val-pago-solar',
+            'input-ahorro-mensual': 'val-ahorro-mensual',
+            'input-total': 'val-total',
+            'input-subtotal': 'val-subtotal',
+            'input-iva': 'val-iva',
+            'input-autos': 'val-autos',
+            'input-co2': 'val-co2',
+            'input-generacion': 'val-generacion',
+            'input-modulos-main': 'val-modulos-main',
+            'input-modulos-sub': 'val-modulos-sub',
+            'input-inversores-main': 'val-inversores-main',
+            'input-inversores-sub': 'val-inversores-sub',
+            'input-tiempo-obra': 'val-tiempo-obra',
+            'input-arranque': 'val-arranque',
+            'input-leasing-mensual': 'val-leasing-mensual',
+            'input-leasing-plazo': 'val-leasing-plazo',
+            'input-tarifa': 'val-tarifa',
+            'input-precio-kwh': 'val-precio-kwh',
+            'input-notas': 'val-notas' // Agregado al mapa
+        };
+
+        function updateDoc() {
+            // Visibilidad Leasing
+            const showLeasing = document.getElementById('input-show-leasing').checked;
+            const leasingSection = document.getElementById('leasing-section');
+            if(leasingSection) leasingSection.style.display = showLeasing ? 'block' : 'none'; 
+
+            // Visibilidad Notas (NUEVO)
+            const notasVal = document.getElementById('input-notas').value;
+            const notasContainer = document.getElementById('container-notas');
+            if(notasContainer) {
+                if(notasVal && notasVal.trim() !== '') {
+                    notasContainer.classList.remove('hidden');
+                } else {
+                    notasContainer.classList.add('hidden');
+                }
+            }
+
+            // Visibilidad Anexo
+            const showAnnex = document.getElementById('input-show-annex').checked;
+            const annexPage = document.getElementById('annex-page');
+            if(annexPage) annexPage.style.display = showAnnex ? 'flex' : 'none';
+
+            // Cálculos Base
+            const pagoActual = getRawValue('input-pago-actual');
+            const pagoSolar = getRawValue('input-pago-solar');
+            let ahorroMensual = 0;
+            if (pagoActual > 0) ahorroMensual = pagoActual - pagoSolar;
+            const inputAhorro = document.getElementById('input-ahorro-mensual');
+            if(inputAhorro) inputAhorro.value = formatMoney(ahorroMensual);
+
+            // Inversión
+            const totalInversion = getRawValue('input-total');
+            let subtotal = 0;
+            let iva = 0;
+            if (totalInversion > 0) {
+                subtotal = totalInversion / 1.16;
+                iva = totalInversion - subtotal;
+            }
+            const inputSubtotal = document.getElementById('input-subtotal');
+            const inputIva = document.getElementById('input-iva');
+            if(inputSubtotal) inputSubtotal.value = formatMoney(subtotal);
+            if(inputIva) inputIva.value = formatMoney(iva);
+
+            // Ahorro Anual Base
+            let ahorroAnualBase = ahorroMensual * 12; 
+            const inputAhorroAnual = document.getElementById('input-ahorro-anual');
+            if(inputAhorroAnual) inputAhorroAnual.value = formatMoney(ahorroAnualBase);
+            
+            // --- CÁLCULOS LEASING (OXA) ---
+            // Factores OXA actualizados al código proporcionado (Netos/Brutos proporcionales)
+            // Se aplican directamente al monto total con IVA
+            const f_inicial = 0.02405306;
+            const f_renta_36 = 0.03726240; 
+            const f_renta_48 = 0.03061276; 
+            const f_renta_60 = 0.02673392;
+            
+            if(totalInversion > 0) {
+                const inicial = totalInversion * f_inicial;
+                
+                // 36 Meses
+                const r36 = totalInversion * f_renta_36;
+                document.getElementById('lease-init-36').innerText = formatMoney(inicial);
+                document.getElementById('lease-rent-36').innerText = formatMoney(r36);
+                document.getElementById('lease-res-36').innerText = formatMoney(r36); // Residual = 1 renta
+
+                // 48 Meses
+                const r48 = totalInversion * f_renta_48;
+                document.getElementById('lease-init-48').innerText = formatMoney(inicial);
+                document.getElementById('lease-rent-48').innerText = formatMoney(r48);
+                document.getElementById('lease-res-48').innerText = formatMoney(r48);
+
+                // 60 Meses
+                const r60 = totalInversion * f_renta_60;
+                document.getElementById('lease-init-60').innerText = formatMoney(inicial);
+                document.getElementById('lease-rent-60').innerText = formatMoney(r60);
+                document.getElementById('lease-res-60').innerText = formatMoney(r60);
+            } else {
+                // Reset tabla si no hay monto
+                 ['36','48','60'].forEach(plazo => {
+                    document.getElementById(`lease-init-${plazo}`).innerText = '-';
+                    document.getElementById(`lease-rent-${plazo}`).innerText = '-';
+                    document.getElementById(`lease-res-${plazo}`).innerText = '-';
+                 });
+            }
+
+            // --- CÁLCULOS FINANCIEROS AVANZADOS (ROI & UTILIDAD) ---
+            let ahorroAcumulado = 0;
+            let ahorroCorriente = ahorroAnualBase; 
+            const factorInflacion = 0.04;
+            const factorMerma = 0; // Merma eliminada
+            const beneficioFiscalPct = 0.40;
+
+            // Arrays para la tabla
+            let tableData = [];
+            
+            // ESCUDO FISCAL: sobre SUBTOTAL (Base Deducible)
+            const escudoFiscal = subtotal * beneficioFiscalPct; 
+            // Inversión Neta = Total con IVA - Beneficio Fiscal (sobre subtotal)
+            const inversionNeta = totalInversion - escudoFiscal;
+
+            if(ahorroAnualBase > 0) {
+                for(let i = 1; i <= 30; i++) { 
+                    // Calcular flujo de este año
+                    ahorroAcumulado += ahorroCorriente;
+                    
+                    // En la tabla, mostramos el acumulado NETO (restando la inversión neta)
+                    tableData.push({
+                        year: i,
+                        savings: ahorroCorriente,
+                        accumulated: ahorroAcumulado - inversionNeta 
+                    });
+
+                    // Proyectar siguiente año (Solo inflación)
+                    ahorroCorriente = ahorroCorriente * (1 + factorInflacion); 
+                }
+                
+                // Utilidad Energética Final (Acumulado - Inversión Neta)
+                const utilidadFinal = ahorroAcumulado - inversionNeta; 
+                
+                const inputAhorro30 = document.getElementById('input-ahorro-30');
+                if(inputAhorro30) {
+                    const millones = utilidadFinal / 1000000;
+                    inputAhorro30.value = millones.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+                }
+            }
+
+            // Renderizar Tabla
+            renderAmortizationTable(tableData);
+
+            // ROI
+            let roiCalculado = 0;
+            if (totalInversion > 0 && ahorroAnualBase > 0) {
+                let ahorroAcumuladoROI = 0;
+                let ahorroCorrienteROI = ahorroAnualBase;
+                let aniosCompletos = 0;
+                
+                for (let i = 1; i <= 20; i++) {
+                    if (ahorroAcumuladoROI + ahorroCorrienteROI >= inversionNeta) {
+                        const faltante = inversionNeta - ahorroAcumuladoROI;
+                        const fraccionAnio = faltante / ahorroCorrienteROI;
+                        roiCalculado = aniosCompletos + fraccionAnio;
+                        break;
+                    }
+                    ahorroAcumuladoROI += ahorroCorrienteROI;
+                    aniosCompletos++;
+                    ahorroCorrienteROI = ahorroCorrienteROI * (1 + factorInflacion);
+                }
+            }
+            const inputRoi = document.getElementById('input-roi');
+            if (inputRoi) {
+                inputRoi.value = roiCalculado > 0 ? roiCalculado.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1}) : 0;
+            }
+
+            // ESG
+            const potencia = getRawValue('input-potencia');
+            let autosCalculados = 0;
+            let co2Calculado = 0;
+            if(potencia > 0) {
+                autosCalculados = Math.round(potencia * 0.16);
+                co2Calculado = potencia * 0.75;
+            }
+            const inputAutos = document.getElementById('input-autos');
+            if(inputAutos) inputAutos.value = autosCalculados;
+            const inputCo2 = document.getElementById('input-co2');
+            if(inputCo2) inputCo2.value = co2Calculado.toLocaleString('en-US', {minimumFractionDigits: 1, maximumFractionDigits: 1});
+
+            // Update DOM Elements
+            for (const [inputId, targetIds] of Object.entries(inputMap)) {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    let value = input.value;
+                    
+                    if (value && value !== '-' && value !== '0') {
+                        if (moneyFields.includes(inputId)) value = formatMoney(value);
+                        if (decimalFields.includes(inputId)) value = formatDecimal(value);
+                    } else if (!value) {
+                        value = '-'; 
+                    }
+
+                    const targets = Array.isArray(targetIds) ? targetIds : [targetIds];
+                    targets.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.innerText = value;
+                    });
+                }
+            }
+            
+            // Progress Bar
+            let widthPercent = 20; 
+            if (pagoActual > 0) {
+                widthPercent = (pagoSolar / pagoActual) * 100;
+                if (widthPercent < 15) widthPercent = 15;
+                if (widthPercent > 100) widthPercent = 100;
+            }
+            const barEl = document.getElementById('bar-pago-solar');
+            if (barEl) barEl.style.width = `${widthPercent}%`;
+
+            updateExtraFieldsDoc();
+            saveData(); 
+        }
+
+        function renderAmortizationTable(data) {
+            const tbody = document.getElementById('amortization-body');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+
+            let roiHit = false;
+
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                const isPositive = row.accumulated > 0;
+                
+                if(isPositive && !roiHit) {
+                    tr.className = 'row-roi-hit';
+                    roiHit = true;
+                }
+
+                tr.innerHTML = `
+                    <td>${row.year}</td>
+                    <td>$ ${row.savings.toLocaleString('en-US', {maximumFractionDigits: 0})}</td>
+                    <td class="${isPositive ? 'text-emerald-600 font-bold' : 'text-red-500'}">
+                        $ ${row.accumulated.toLocaleString('en-US', {maximumFractionDigits: 0})}
+                    </td>
+                    <td>
+                        ${isPositive ? 'UTILIDAD' : 'RECUPERACIÓN'}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        let extraFieldsCount = 0;
+
+        function addExtraField(label = '', value = '') {
+            extraFieldsCount++;
+            const container = document.getElementById('sidebar-extras-container');
+            const div = document.createElement('div');
+            div.className = 'extra-field-wrapper';
+            div.id = `extra-wrapper-${extraFieldsCount}`;
+            div.innerHTML = `
+                <div class="btn-delete" onclick="removeExtraField(${extraFieldsCount})"><i class="fa-solid fa-times"></i></div>
+                <input type="text" class="input-field mb-1 text-xs extra-label" placeholder="Nombre (Ej. Baterías)" value="${label}" oninput="updateDoc()">
+                <input type="text" class="input-field text-xs text-slate-300 extra-value" placeholder="Valor (Ej. 10kWh)" value="${value}" oninput="updateDoc()">
+            `;
+            container.appendChild(div);
+            if (!label && !value) updateDoc(); 
+        }
+
+        function removeExtraField(id) {
+            const el = document.getElementById(`extra-wrapper-${id}`);
+            if (el) el.remove();
+            updateDoc();
+        }
+
+        function updateExtraFieldsDoc() {
+            const container = document.getElementById('sidebar-extras-container');
+            const docContainer = document.getElementById('doc-extras-container');
+            docContainer.innerHTML = '';
+            const wrappers = container.getElementsByClassName('extra-field-wrapper');
+            for (let wrapper of wrappers) {
+                const labelVal = wrapper.querySelector('.extra-label').value;
+                const valueVal = wrapper.querySelector('.extra-value').value;
+                if (labelVal || valueVal) {
+                    const li = document.createElement('li');
+                    li.className = 'flex justify-between items-start border-b border-slate-100 pb-3 pt-2';
+                    li.innerHTML = `<span class="text-[11px] text-slate-500">${labelVal}</span><div class="text-right"><span class="text-[11px] font-bold text-slate-900 block">${valueVal}</span></div>`;
+                    docContainer.appendChild(li);
+                }
+            }
+        }
+
+        // --- PERSISTENCE LOGIC (CLEAN KEY) ---
+        const STORAGE_KEY = 'elektronState_v16_final'; 
+
+        function saveData() {
+            try {
+                const data = {};
+                for (const inputId of Object.keys(inputMap)) {
+                    const el = document.getElementById(inputId);
+                    if (el) data[inputId] = el.value;
+                }
+                const checkbox = document.getElementById('input-show-leasing');
+                if(checkbox) data.showLeasing = checkbox.checked;
+                
+                const checkAnnex = document.getElementById('input-show-annex');
+                if(checkAnnex) data.showAnnex = checkAnnex.checked;
+                
+                const extras = [];
+                document.querySelectorAll('.extra-field-wrapper').forEach(wrapper => {
+                    extras.push({
+                        label: wrapper.querySelector('.extra-label').value,
+                        value: wrapper.querySelector('.extra-value').value
+                    });
+                });
+                data.extras = extras;
+
+                const logoImg = document.getElementById('logo-preview');
+                if (logoImg.style.display === 'block') {
+                    data.logoSrc = logoImg.src;
+                }
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch (e) {
+                console.error("Error saving state:", e);
+            }
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) {
+                updateDoc(); 
+                return;
+            }
+
+            try {
+                const data = JSON.parse(saved);
+                
+                for (const [key, val] of Object.entries(data)) {
+                    if (key === 'extras' || key === 'logoSrc' || key === 'showLeasing' || key === 'showAnnex') continue;
+                    const el = document.getElementById(key);
+                    if (el) el.value = val;
+                }
+                
+                if (data.showLeasing !== undefined) {
+                    const checkbox = document.getElementById('input-show-leasing');
+                    if(checkbox) checkbox.checked = data.showLeasing;
+                }
+
+                if (data.showAnnex !== undefined) {
+                    const checkAnnex = document.getElementById('input-show-annex');
+                    if(checkAnnex) checkAnnex.checked = data.showAnnex;
+                }
+
+                const container = document.getElementById('sidebar-extras-container');
+                container.innerHTML = ''; 
+                extraFieldsCount = 0;
+                
+                if (data.extras && Array.isArray(data.extras)) {
+                    data.extras.forEach(item => {
+                        addExtraField(item.label, item.value);
+                    });
+                }
+
+                if (data.logoSrc) {
+                    const img = document.getElementById('logo-preview');
+                    img.src = data.logoSrc;
+                    img.style.display = 'block';
+                    document.getElementById('logo-placeholder-content').style.display = 'none';
+                    document.getElementById('logo-container').classList.add('has-logo');
+                }
+
+                updateDoc(); 
+            } catch (e) {
+                console.error("Error loading state:", e);
+                updateDoc();
+            }
+        }
+
+        function resetData() {
+            if(confirm('¿Estás seguro de borrar todos los datos y empezar de cero?')) {
+                localStorage.removeItem(STORAGE_KEY);
+                location.reload();
+            }
+        }
+        
+        window.addEventListener('load', loadData);
+    </script>
+</body>
+</html>
